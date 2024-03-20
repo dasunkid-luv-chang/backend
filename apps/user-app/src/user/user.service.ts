@@ -1,38 +1,37 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common"
 import { UserRepository } from "./user.repository"
 import { CreateUserDto } from "./dto/create-user.dto"
-import { UserDocument } from "./schemas/user.schema"
-import { CreatedUserOuput } from "./types/create-user.ouput"
 
 @Injectable()
 export class UsersService {
   constructor(private readonly userRepository: UserRepository) {}
 
   async create(dto: CreateUserDto) {
-    const user = await this.userRepository.findOne({ email: dto.username })
-    if (user) {
+    const isUserExists = await this.isUserExists(dto.email)
+
+    if (isUserExists) {
       throw new ConflictException("User already exists")
     }
 
     const createdUser = await this.userRepository.create(dto)
-    return this.omitPassword(createdUser)
-  }
-
-  async findByEmail(email: string) {
-    return this.userRepository.findOne({ email })
+    const { password, ...rest } = createdUser.toObject()
+    return rest
   }
 
   async findById(id: string) {
-    const user = await this.userRepository.findById(id)
+    const user = await this.userRepository.findById(id, { password: 0 })
     if (!user) {
       throw new NotFoundException("User not found")
     }
-
     return user
   }
 
-  omitPassword(user: UserDocument): CreatedUserOuput {
-    const { password, ...rest } = user.toObject()
-    return rest as CreatedUserOuput
+  async findByEmail(email: string) {
+    return this.userRepository.findOne({ email }, { password: 0 }, { lean: true })
+  }
+
+  async isUserExists(email: string) {
+    const user = await this.userRepository.findOne({ email }, { id: 1 }, { lean: true })
+    return !!user
   }
 }

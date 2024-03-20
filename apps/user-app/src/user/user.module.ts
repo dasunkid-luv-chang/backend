@@ -1,4 +1,4 @@
-import { DatabaseModule } from "@app/common"
+import { DatabaseModule, TokenService } from "@app/common"
 import { Module } from "@nestjs/common"
 import { User, UserSchema } from "./schemas/user.schema"
 import { UserController } from "./user.controller"
@@ -17,7 +17,7 @@ import { JwtService } from "@nestjs/jwt"
     ]),
   ],
   controllers: [UserController],
-  providers: [UsersService, UserRepository, JwtService],
-  exports: [UsersService],
+  providers: [UsersService, UserRepository, JwtService, TokenService],
+  exports: [UsersService, UserRepository],
 })
 export class UserModule {}

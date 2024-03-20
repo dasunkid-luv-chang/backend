@@ -1,13 +1,9 @@
+import { TokenService } from "@app/common"
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common"
-import { ConfigService } from "@nestjs/config"
-import { JwtService } from "@nestjs/jwt"
 
 @Injectable()
 export class JwtGuard implements CanActivate {
-  constructor(
-    private jwtService: JwtService,
-    private configService: ConfigService,
-  ) {}
+  constructor(private tokenService: TokenService) {}
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest()
     const token = this.extractTokenFromHeader(request)
@@ -17,9 +13,7 @@ export class JwtGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get("ACCESS_TOKEN_SECRET"),
-      })
+      const payload = await this.tokenService.verifyToken(token, "access")
       request.user = payload
     } catch (error) {
       throw new UnauthorizedException()

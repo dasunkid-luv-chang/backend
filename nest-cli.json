@@ -36,6 +36,19 @@
       "compilerOptions": {
         "tsConfigPath": "libs/common/tsconfig.lib.json"
       }
+    },
+    "mail-app": {
+      "type": "application",
+      "root": "apps/mail-app",
+      "entryFile": "main",
+      "sourceRoot": "apps/mail-app/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/mail-app/tsconfig.app.json",
+        "assets": [
+          "templates/**/*"
+        ],
+        "watchAssets": true
+      }
     }
   }
 }

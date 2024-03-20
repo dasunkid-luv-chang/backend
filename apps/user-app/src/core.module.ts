@@ -5,7 +5,7 @@ import { UserModule } from "./user/user.module"
 import { AuthModule } from "./auth/auth.module"
 
 @Module({
-  imports: [LoggerModule, ConfigModule.forRoot({ isGlobal: true }), UserModule, AuthModule],
+  imports: [LoggerModule, ConfigModule.forRoot({ isGlobal: true }), AuthModule, UserModule],
   controllers: [],
   providers: [],
 })

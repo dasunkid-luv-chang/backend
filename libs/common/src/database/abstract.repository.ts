@@ -1,9 +1,13 @@
-import { Logger, NotFoundException } from "@nestjs/common"
-import { FilterQuery, Model, QueryOptions, UpdateQuery } from "mongoose"
+import { FilterQuery, Model, ProjectionType, UpdateQuery } from "mongoose"
+
+interface IQueryOptions {
+  sort?: any
+  limit?: number
+  skip?: number
+  lean?: boolean
+}
 
 export class AbstractRepository<T> {
-  protected readonly logger: Logger
-
   constructor(protected readonly model: Model<T>) {}
 
   async create(entity: Partial<T>): Promise<T> {
@@ -11,37 +15,43 @@ export class AbstractRepository<T> {
     return (await createdEntity.save()) as T
   }
 
-  async findOne(filterQuery: FilterQuery<T>): Promise<T> {
-    const document = (await this.model.findOne(filterQuery, {}, { lean: true })) as T
-
-    // if (!document) {
-    //   this.logger.warn(`Document not found with filterQuery: ${JSON.stringify(filterQuery)}`)
-    //   throw new NotFoundException("Document not found")
-    // }
-
-    return document
+  async count(filterQuery: FilterQuery<T>): Promise<number> {
+    return this.model.countDocuments(filterQuery)
   }
 
-  async findOneAndUpdate(filterQuery: FilterQuery<T>, update: UpdateQuery<T>): Promise<T> {
-    const document = (await this.model.findOneAndUpdate(filterQuery, update, {
-      lean: true,
-      new: true,
-    })) as T
-
-    if (!document) {
-      this.logger.warn(`Document not found with filterQuery: ${JSON.stringify(filterQuery)}`)
-      throw new NotFoundException("Document not found")
-    }
-
-    return document
+  async delete(filterQuery: FilterQuery<T>): Promise<void> {
+    await this.model.deleteMany(filterQuery)
   }
 
-  async find(filterQuery: FilterQuery<T>): Promise<T[]> {
-    return (await this.model.find(filterQuery, {}, { lean: true })) as T[]
+  async update(
+    filterQuery: FilterQuery<T>,
+    update: UpdateQuery<T>,
+    options?: IQueryOptions,
+  ): Promise<void> {
+    await this.model.updateMany(filterQuery, update, options)
   }
 
-  // QueryOptions: sort, limit, skip, projection ...
-  async findById(id: string, option?: QueryOptions): Promise<T> {
-    return this.model.findById(id, option)
+  async aggregate(pipeline: any[]): Promise<any[]> {
+    return this.model.aggregate(pipeline)
+  }
+
+  async find(
+    filterQuery: FilterQuery<T>,
+    projection?: ProjectionType<T>,
+    options?: IQueryOptions,
+  ): Promise<T[]> {
+    return this.model.find(filterQuery, projection, options)
+  }
+
+  async findOne(
+    filterQuery: FilterQuery<T>,
+    projection?: ProjectionType<T>,
+    options?: IQueryOptions,
+  ): Promise<T | null> {
+    return this.model.findOne(filterQuery, projection, options)
+  }
+
+  async findById(id: string, projection?: ProjectionType<T>): Promise<T | null> {
+    return this.model.findById(id, projection).exec()
   }
 }
