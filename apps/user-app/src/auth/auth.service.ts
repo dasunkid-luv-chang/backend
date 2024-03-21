@@ -24,8 +24,15 @@ export class AuthService {
 
   async signup(dto: SignUpDto) {
     const createdUser = await this.userService.create(dto)
+    const { _id, email, fullname } = createdUser
 
-    await this.sendActivationEmail(createdUser)
+    const payload = {
+      email,
+      id: _id,
+    }
+
+    const userInfo = { fullname }
+    await this.sendActivationEmail(email, payload, userInfo)
 
     return createdUser
   }
@@ -81,7 +88,15 @@ export class AuthService {
       throw new BadRequestException("User already deactivated")
     }
 
-    await this.sendActivationEmail(user)
+    const { _id, fullname } = user
+    const payload = {
+      email,
+      id: _id,
+    }
+
+    const userInfo = { fullname }
+
+    await this.sendActivationEmail(email, payload, userInfo)
 
     // send success response
     res.status(200).send({ message: "Activation email sent successfully", success: true })
@@ -95,8 +110,6 @@ export class AuthService {
     const user = await this.userRepository.findById(id)
 
     const isPasswordMatched = await compare(dto.currentPassword, user.password)
-    console.log("🚀 ~ AuthService ~ changePassword ~ user.password:", user.password)
-    console.log("🚀 ~ AuthService ~ changePassword ~ dto.currentPassword:", dto.currentPassword)
     if (!isPasswordMatched) {
       throw new UnauthorizedException("Current password is incorrect")
     }
@@ -108,21 +121,52 @@ export class AuthService {
     return this.refreshToken(user)
   }
 
-  async forgotPassword(email: string) {
+  async forgotPassword(email: string, res: Response) {
     const user = await this.userService.findByEmail(email)
 
     if (!user) {
       throw new BadRequestException("User not exists with this email")
     }
 
-    // todo send email with token
+    const payload = {
+      email: user.email,
+      id: user._id,
+    }
+
+    await this.sendForgotPasswordEmail(user.email, payload)
+
+    res.status(200).send({ message: "Forgot password email sent successfully", success: true })
+  }
+
+  async resetPassword(token: string, candidatePassword: string, res: Response) {
+    let payload = null
+    try {
+      payload = await this.tokenService.verifyToken(token, "forgot")
+    } catch (error) {
+      console.log("🚀 ~ AuthService ~ resetPassword ~ error:", error)
+      throw new BadRequestException("Invalid token")
+    }
+
+    const { id } = payload
+    const user = await this.userRepository.findById(id)
+
+    if (user.status === 0) {
+      throw new BadRequestException("User not activated, can not change password")
+    } else if (user.status === 2) {
+      throw new BadRequestException("User already deactivated, can not change password")
+    }
+
+    // save new password
+    user.password = candidatePassword
+    await user.save()
+    res.status(200).send({ message: "Password changed successfully", success: true })
   }
 
   async validateUser(dto: SignInDto) {
     const user = await this.userRepository.findOne({ email: dto.email }, null, { lean: true })
 
     if (!user) {
-      throw new UnauthorizedException("Email is incorrect")
+      throw new BadRequestException("User not found with this email")
     }
 
     if (user.status === 0) {
@@ -153,11 +197,7 @@ export class AuthService {
     return { accessToken, refreshToken }
   }
 
-  async sendActivationEmail(user: any) {
-    const payload = {
-      email: user.email,
-      id: user._id,
-    }
+  async sendActivationEmail(email: string, payload: any, userInfo: any) {
     const activationToken = await this.tokenService.generateToken(payload, "activation")
     console.log("🚀 ~ AuthService ~ signup ~ activationToken:", activationToken)
     const url =
@@ -167,8 +207,28 @@ export class AuthService {
     await lastValueFrom(
       this.mailClient.emit("send_activation_email", {
         url,
-        email: user.email,
-        fullname: user.fullname,
+        email,
+        ...userInfo,
+      }),
+    )
+  }
+
+  async sendForgotPasswordEmail(email: string, payload: any) {
+    const forgotPasswordToken = await this.tokenService.generateToken(payload, "forgot")
+    console.log(
+      "🚀 ~ AuthService ~ sendForgotPasswordEmail ~ forgotPasswordToken:",
+      forgotPasswordToken,
+    )
+    const url =
+      this.configService.get<string>("FRONTEND_URL") +
+      "/auth/reset-password?token=" +
+      forgotPasswordToken
+
+    // send forgot password email
+    await lastValueFrom(
+      this.mailClient.emit("send_forgot_password_email", {
+        url,
+        email,
       }),
     )
   }
